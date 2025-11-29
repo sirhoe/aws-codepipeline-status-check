@@ -5610,3 +5610,7 @@ node_modules/yallist/LICENSE
 node_modules/yallist/package.json
 node_modules/yallist/README.md
 node_modules/yallist/yallist.js
+dist/manifest.json
+dist/icons/icon16.png
+dist/icons/icon48.png
+dist/icons/icon128.png
