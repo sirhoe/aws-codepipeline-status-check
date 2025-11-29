@@ -1,0 +1,30 @@
+export interface Settings {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  pipelineFilter?: string;
+  refreshIntervalMs: number;
+}
+
+export interface PipelineExecutionSummary {
+  pipelineExecutionId: string;
+  status: string;
+  startTime?: string;
+  lastUpdateTime?: string;
+}
+
+export interface PipelineStatus {
+  pipelineName: string;
+  executions: PipelineExecutionSummary[];
+}
+
+export interface PipelineStatusState {
+  lastUpdated: string;
+  pipelines: PipelineStatus[];
+  error?: string;
+}
+
+export type RefreshMessage = {
+  type: 'refreshNow';
+};
+
