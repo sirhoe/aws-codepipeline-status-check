@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-codepipeline";
 import { createCodePipelineClient } from "../awsClient";
 import { getSettings, savePipelineStatus } from "../storage";
-import { PipelineStatus, PipelineStatusState, Settings, PipelineExecutionSummary } from "../types";
+import { PipelineStatus, PipelineStatusState, PipelineExecutionSummary } from "../types";
 
 const ALARM_NAME = 'poll_codepipeline';
 
@@ -20,9 +20,8 @@ async function fetchPipelineStatus() {
     }
 
     // Safe to cast because we checked for existence, though Typescript might complain if we don't be explicit
-    const validSettings = settings as Required<Settings>;
-
-    const client = createCodePipelineClient(validSettings);
+    // We handle roleArn being optional
+    const client = await createCodePipelineClient(settings as any);
 
     // List Pipelines
     // Limit to 100 for now as per plan
@@ -32,8 +31,8 @@ async function fetchPipelineStatus() {
     let pipelines: PipelineSummary[] = listResponse.pipelines || [];
 
     // Filter
-    if (validSettings.pipelineFilter) {
-      const filter = validSettings.pipelineFilter.toLowerCase();
+    if (settings.pipelineFilter) {
+      const filter = settings.pipelineFilter.toLowerCase();
       pipelines = pipelines.filter(p => p.name?.toLowerCase().includes(filter));
     }
 

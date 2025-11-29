@@ -8,6 +8,7 @@ export const Options = () => {
   const [accessKeyId, setAccessKeyId] = useState('');
   const [secretAccessKey, setSecretAccessKey] = useState('');
   const [region, setRegion] = useState('us-east-1');
+  const [roleArn, setRoleArn] = useState('');
   const [pipelineFilter, setPipelineFilter] = useState('');
   const [refreshValue, setRefreshValue] = useState(60);
   const [refreshUnit, setRefreshUnit] = useState<'seconds' | 'minutes'>('seconds');
@@ -24,6 +25,7 @@ export const Options = () => {
     if (settings.accessKeyId) setAccessKeyId(settings.accessKeyId);
     if (settings.secretAccessKey) setSecretAccessKey(settings.secretAccessKey);
     if (settings.region) setRegion(settings.region);
+    if (settings.roleArn) setRoleArn(settings.roleArn);
     if (settings.pipelineFilter) setPipelineFilter(settings.pipelineFilter);
     
     if (settings.refreshIntervalMs) {
@@ -49,6 +51,7 @@ export const Options = () => {
       accessKeyId,
       secretAccessKey,
       region,
+      roleArn,
       pipelineFilter,
       refreshIntervalMs: ms
     };
@@ -72,7 +75,7 @@ export const Options = () => {
     setStatusMsg(null);
 
     try {
-      const client = createCodePipelineClient({ accessKeyId, secretAccessKey, region });
+      const client = await createCodePipelineClient({ accessKeyId, secretAccessKey, region, roleArn });
       const command = new ListPipelinesCommand({ maxResults: 1 });
       await client.send(command);
       setStatusMsg({ text: 'Connection OK!', type: 'success' });
@@ -128,6 +131,17 @@ export const Options = () => {
       </div>
 
       <div className="form-group">
+        <label>Role ARN to Assume (Optional)</label>
+        <input 
+          type="text" 
+          value={roleArn} 
+          onChange={(e) => setRoleArn(e.target.value)} 
+          placeholder="arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+        />
+        <small>Specify an IAM Role ARN if your user needs to assume a role to access CodePipeline.</small>
+      </div>
+
+      <div className="form-group">
         <label>Pipeline Name Filter (Optional)</label>
         <input 
           type="text" 
@@ -169,4 +183,3 @@ export const Options = () => {
     </div>
   );
 };
-
