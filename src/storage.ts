@@ -4,8 +4,8 @@ const SETTINGS_KEY = 'settings';
 const STATUS_KEY = 'pipelineStatus';
 
 const DEFAULT_SETTINGS: Partial<Settings> = {
-  region: 'us-east-1',
-  refreshIntervalMs: 60000,
+  region: 'ap-southeast-2',
+  refreshIntervalMs: 180000,
 };
 
 export async function getSettings(): Promise<Partial<Settings>> {

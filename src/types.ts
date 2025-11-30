@@ -22,6 +22,8 @@ export interface PipelineStatus {
 export interface PipelineStatusState {
   lastUpdated: string;
   pipelines: PipelineStatus[];
+  totalPipelines?: number;
+  matchedPipelines?: number;
   error?: string;
 }
 

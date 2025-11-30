@@ -46,22 +46,32 @@ async function fetchPipelineStatus() {
     // We handle roleArn being optional
     const client = await createCodePipelineClient(settings as any);
 
-    // List Pipelines
-    // Limit to 100 for now as per plan
-    const listCommand = new ListPipelinesCommand({ maxResults: 100 });
-    const listResponse = await client.send(listCommand);
-    
-    let pipelines: PipelineSummary[] = listResponse.pipelines || [];
+    // List all Pipelines (AWS paginates at 100 items, so we loop)
+    const pipelines: PipelineSummary[] = [];
+    let nextToken: string | undefined;
+    do {
+      const listCommand = new ListPipelinesCommand({
+        maxResults: 100,
+        nextToken
+      });
+      const listResponse = await client.send(listCommand);
+      pipelines.push(...(listResponse.pipelines || []));
+      nextToken = listResponse.nextToken;
+    } while (nextToken);
+
+    const totalPipelines = pipelines.length;
 
     // Filter
-    if (settings.pipelineFilter) {
-      const filter = settings.pipelineFilter.toLowerCase();
-      pipelines = pipelines.filter(p => p.name?.toLowerCase().includes(filter));
+    let filteredPipelines = pipelines;
+    const normalizedFilter = settings.pipelineFilter?.trim().toLowerCase();
+    if (normalizedFilter) {
+      filteredPipelines = pipelines.filter(p => p.name?.toLowerCase().includes(normalizedFilter));
     }
+    const matchedPipelines = filteredPipelines.length;
 
     const pipelineStatuses: PipelineStatus[] = [];
 
-    for (const pipeline of pipelines) {
+    for (const pipeline of filteredPipelines) {
       if (!pipeline.name) continue;
 
       try {
@@ -97,6 +107,8 @@ async function fetchPipelineStatus() {
     const state: PipelineStatusState = {
       lastUpdated: new Date().toISOString(),
       pipelines: pipelineStatuses,
+      totalPipelines,
+      matchedPipelines,
       error: undefined
     };
 
@@ -107,6 +119,8 @@ async function fetchPipelineStatus() {
     const errorState: PipelineStatusState = {
       lastUpdated: new Date().toISOString(),
       pipelines: [],
+      totalPipelines: 0,
+      matchedPipelines: 0,
       error: error.message || "Unknown error occurred"
     };
     await savePipelineStatus(errorState);

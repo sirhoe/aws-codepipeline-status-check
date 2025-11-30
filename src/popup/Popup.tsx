@@ -164,6 +164,13 @@ export const Popup = () => {
         </div>
       )}
 
+      {statusState && (
+        <div className="pipelines-summary">
+          <span>Total pipelines: {statusState.totalPipelines ?? statusState.pipelines.length}</span>
+          <span>Matched filter: {statusState.matchedPipelines ?? statusState.pipelines.length}</span>
+        </div>
+      )}
+
       <div className="content">
         {!statusState && !loading && <div className="empty-message">No data available.</div>}
         
