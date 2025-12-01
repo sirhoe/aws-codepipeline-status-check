@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPipelineStatus, getSettings } from '../storage';
-import { PipelineStatusState, PipelineStatus } from '../types';
+import { PipelineStatus } from '../types';
 
 const STATUS_COLORS: Record<string, string> = {
   'Succeeded': '#28a745',
@@ -78,50 +79,60 @@ const PipelineItem = ({ pipeline }: { pipeline: PipelineStatus }) => {
 };
 
 export const Popup = () => {
-  const [statusState, setStatusState] = useState<PipelineStatusState | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [configured, setConfigured] = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: settings, isLoading: isSettingsLoading } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings
+  });
+
+  const { data: statusState, isLoading: isStatusLoading } = useQuery({
+    queryKey: ['pipelineStatus'],
+    queryFn: getPipelineStatus
+  });
+
+  const refreshMutation = useMutation({
+    mutationFn: async () => {
+      return new Promise<void>((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: 'refreshNow' }, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        });
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipelineStatus'] });
+    }
+  });
 
   useEffect(() => {
-    checkConfigAndLoad();
-    
     const handleStorageChange = (changes: any, area: string) => {
-      if (area === 'local' && changes.pipelineStatus) {
-        setStatusState(changes.pipelineStatus.newValue);
-        setLoading(false);
+      if (area === 'local') {
+        if (changes.pipelineStatus) {
+          queryClient.setQueryData(['pipelineStatus'], changes.pipelineStatus.newValue);
+        }
+        if (changes.settings) {
+          queryClient.invalidateQueries({ queryKey: ['settings'] });
+        }
       }
     };
 
     chrome.storage.onChanged.addListener(handleStorageChange);
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
-  }, []);
+  }, [queryClient]);
 
-  const checkConfigAndLoad = async () => {
-    const settings = await getSettings();
-    if (!settings.accessKeyId || !settings.secretAccessKey || !settings.region) {
-      setConfigured(false);
-      return;
+  // Trigger initial refresh if no data and settings are valid
+  useEffect(() => {
+    if (!isStatusLoading && !statusState && settings?.accessKeyId) {
+      refreshMutation.mutate();
     }
-    
-    const status = await getPipelineStatus();
-    if (status) {
-      setStatusState(status);
-    } else {
-      // Initial fetch if no data
-      handleRefresh();
-    }
-  };
+  }, [isStatusLoading, statusState, settings, refreshMutation.mutate]); // Be careful with dependencies here
 
   const handleRefresh = () => {
-    setLoading(true);
-    chrome.runtime.sendMessage({ type: 'refreshNow' }, () => {
-       // The background worker sends response when done, but we also rely on storage listener
-       // This just handles the trigger.
-       if (chrome.runtime.lastError) {
-           console.error("Error sending message:", chrome.runtime.lastError);
-           setLoading(false);
-       }
-    });
+    refreshMutation.mutate();
   };
 
   const openOptions = () => {
@@ -132,7 +143,10 @@ export const Popup = () => {
     }
   };
 
-  if (!configured) {
+  const isLoading = isStatusLoading || refreshMutation.isPending;
+  const configured = !isSettingsLoading && settings?.accessKeyId && settings?.secretAccessKey && settings?.region;
+
+  if (!isSettingsLoading && !configured) {
     return (
       <div className="container empty-state">
         <h3>Welcome!</h3>
@@ -152,8 +166,9 @@ export const Popup = () => {
                     {new Date(statusState.lastUpdated).toLocaleTimeString()}
                  </span>
              )}
-             <button className="refresh-btn" onClick={handleRefresh} disabled={loading}>
-               {loading ? '↻...' : '↻'}
+             {isLoading && <span style={{ fontSize: '12px', color: '#ccc' }}>loading ...</span>}
+             <button className="refresh-btn" onClick={handleRefresh} disabled={isLoading}>
+               ↻
              </button>
         </div>
       </header>
@@ -172,7 +187,7 @@ export const Popup = () => {
       )}
 
       <div className="content">
-        {!statusState && !loading && <div className="empty-message">No data available.</div>}
+        {!statusState && !isLoading && <div className="empty-message">No data available.</div>}
         
         {statusState?.pipelines.length === 0 && !statusState.error && (
            <div className="empty-message">No pipelines found. Check your region and filters.</div>
