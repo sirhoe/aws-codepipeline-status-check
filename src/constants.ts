@@ -21,3 +21,4 @@ export const DEFAULT_SETTINGS: Partial<Settings> = {
   refreshIntervalMs: 180000,
 };
 
+
