@@ -1,12 +1,5 @@
 import { Settings, PipelineStatusState } from './types';
-
-const SETTINGS_KEY = 'settings';
-const STATUS_KEY = 'pipelineStatus';
-
-const DEFAULT_SETTINGS: Partial<Settings> = {
-  region: 'ap-southeast-2',
-  refreshIntervalMs: 180000,
-};
+import { SETTINGS_KEY, STATUS_KEY, DEFAULT_SETTINGS } from './constants';
 
 export async function getSettings(): Promise<Partial<Settings>> {
   const result = await chrome.storage.local.get(SETTINGS_KEY);
@@ -25,4 +18,3 @@ export async function getPipelineStatus(): Promise<PipelineStatusState | null> {
 export async function savePipelineStatus(status: PipelineStatusState): Promise<void> {
   await chrome.storage.local.set({ [STATUS_KEY]: status });
 }
-

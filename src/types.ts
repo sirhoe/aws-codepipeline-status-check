@@ -31,3 +31,7 @@ export type RefreshMessage = {
   type: 'refreshNow';
 };
 
+export type RefreshResponse = {
+  success: boolean;
+  error?: string;
+};

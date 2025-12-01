@@ -4,34 +4,14 @@ import {
   PipelineSummary,
   PipelineExecutionSummary as AWSPipelineExecutionSummary
 } from "@aws-sdk/client-codepipeline";
-import { DOMParser as XmldomDOMParser } from "@xmldom/xmldom";
 import { createCodePipelineClient } from "../awsClient";
 import { getSettings, savePipelineStatus } from "../storage";
-import { PipelineStatus, PipelineStatusState, PipelineExecutionSummary } from "../types";
+import { PipelineStatus, PipelineStatusState, PipelineExecutionSummary, RefreshMessage } from "../types";
+import { ALARM_NAME } from "../constants";
+import { installXmlPolyfill } from "../utils/xml-polyfill";
 
-// Ensure DOM APIs exist for AWS SDK XML parsing inside the service worker.
-const globalAny = globalThis as any;
-if (typeof globalAny.DOMParser === "undefined") {
-  globalAny.DOMParser = XmldomDOMParser;
-}
-if (typeof globalAny.Node === "undefined") {
-  globalAny.Node = {
-    ELEMENT_NODE: 1,
-    ATTRIBUTE_NODE: 2,
-    TEXT_NODE: 3,
-    CDATA_SECTION_NODE: 4,
-    ENTITY_REFERENCE_NODE: 5,
-    ENTITY_NODE: 6,
-    PROCESSING_INSTRUCTION_NODE: 7,
-    COMMENT_NODE: 8,
-    DOCUMENT_NODE: 9,
-    DOCUMENT_TYPE_NODE: 10,
-    DOCUMENT_FRAGMENT_NODE: 11,
-    NOTATION_NODE: 12
-  };
-}
-
-const ALARM_NAME = 'poll_codepipeline';
+// Install XML Polyfill for AWS SDK in Service Worker
+installXmlPolyfill();
 
 async function fetchPipelineStatus() {
   try {
@@ -42,8 +22,7 @@ async function fetchPipelineStatus() {
       return;
     }
 
-    // Safe to cast because we checked for existence, though Typescript might complain if we don't be explicit
-    // We handle roleArn being optional
+    // Safe to cast because we checked for existence
     const client = await createCodePipelineClient(settings as any);
 
     // List all Pipelines (AWS paginates at 100 items, so we loop)
@@ -99,7 +78,7 @@ async function fetchPipelineStatus() {
         // We continue to other pipelines even if one fails
         pipelineStatuses.push({
             pipelineName: pipeline.name,
-            executions: [] // Or maybe indicate error in this specific pipeline status? Plan doesn't specify per-pipeline error.
+            executions: []
         });
       }
     }
@@ -131,7 +110,7 @@ async function updateAlarm() {
   const settings = await getSettings();
   // Default to 60 seconds if not set
   const intervalMs = settings.refreshIntervalMs || 60000;
-  const intervalMinutes = Math.max(intervalMs / 60000, 0.5); // Minimum 30 seconds approx, chrome alarms min is 1 min usually but let's try.
+  const intervalMinutes = Math.max(intervalMs / 60000, 0.5); // Minimum 30 seconds approx
   
   // Clear existing
   await chrome.alarms.clear(ALARM_NAME);
@@ -149,7 +128,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: RefreshMessage, _sender, sendResponse) => {
   if (message.type === 'refreshNow') {
     fetchPipelineStatus().then(() => {
       sendResponse({ success: true });
@@ -167,11 +146,8 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.settings) {
     updateAlarm();
-    // Optionally trigger a fetch if settings changed significantly, but user might be typing.
-    // Let's just update alarm and let the next tick handle it, or user can manual refresh.
   }
 });
 
 // Also initialize on startup
 updateAlarm();
-
