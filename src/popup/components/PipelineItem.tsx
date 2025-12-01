@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PipelineStatus } from '../../types';
 import { getStatusColor } from '../../utils/status';
-import { formatTimeAgo } from '../../utils/date';
+import { formatTimeAgo, formatDetailedTimeAgo } from '../../utils/date';
 
 interface PipelineItemProps {
   pipeline: PipelineStatus;
@@ -31,7 +31,7 @@ export const PipelineItem = ({ pipeline }: PipelineItemProps) => {
             <span className="status-badge" style={{ backgroundColor: getStatusColor(latest.status) }}>
               {latest.status}
             </span>
-            <span className="time-ago">{formatTimeAgo(latest.lastUpdateTime || latest.startTime)}</span>
+            <span className="time-ago">{formatDetailedTimeAgo(latest.lastUpdateTime || latest.startTime)}</span>
           </div>
         </div>
         <button className="expand-btn">{expanded ? '▲' : '▼'}</button>
