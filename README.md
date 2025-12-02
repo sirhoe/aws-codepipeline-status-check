@@ -1,122 +1,89 @@
 # AWS CodePipeline Status - Chrome Extension
 
-A secure, client-side Chrome extension to monitor your AWS CodePipeline statuses directly from your browser toolbar.
+A secure, client-side Chrome extension to monitor AWS CodePipeline statuses from your browser toolbar.
 
 ## Overview
 
-This extension allows you to track the status of your AWS CodePipelines without opening the AWS Console. It runs entirely within your browser, storing credentials locally and communicating directly with AWS APIs. No backend service or third-party server is involved.
+The popup dashboard (built with React 18, TypeScript, Vite, and TanStack Query) calls AWS CodePipeline directly through the official AWS SDK v3 and stores credentials only inside Chrome’s sandboxed storage. A Manifest V3 service worker schedules refreshes without ever sending data to third-party servers, so everything stays in your browser.
 
-## Features
+![Popup preview showing four succeeded pipelines](docs/codepipeline-status.png)
 
-- **Real-time Dashboard**: View status of multiple pipelines in a popup.
-- **Detailed History**: Expand pipelines to see recent execution history.
-- **Secure**: Credentials stored in `chrome.storage.local` and never leave your browser (except to AWS).
-- **Filtering**: Filter pipelines by name.
-- **Auto-Refresh**: Configurable polling interval.
-- **Manual Refresh**: Instant refresh button.
+## Feature
 
-## Security
-
-- **Local Storage**: AWS Access Keys are stored in Chrome's Local Storage (unencrypted by Chrome, but sandboxed to the extension).
-- **Direct Communication**: The extension calls AWS CodePipeline APIs directly using the AWS SDK for JavaScript v3.
-- **No Analytics**: No usage data is collected or sent anywhere.
-
-**Recommendation**: Always use a dedicated IAM User with minimum required permissions (Read-Only).
+- **Live pipeline list** with total and filtered counts, status badges, and quick manual refresh.
+- **Execution summaries** for each pipeline, including timestamps pulled via `listPipelineExecutions`.
+- **Smart filtering & rate limiting** so long AWS orgs can search thousands of pipelines without spamming the API.
+- **Auto-refresh loop** backed by the background service worker and alarms (default 3 minutes, min 30 seconds).
+- **Secure credential handling** that optionally assumes IAM roles before instantiating the `CodePipelineClient`.
+- **Error-first UX** with toast + inline messaging, making misconfigured credentials obvious.
 
 ## Prerequisites
 
-- Google Chrome, Microsoft Edge, or any Chromium-based browser.
-- An AWS Account.
-- An IAM User with programmatic access keys.
+- Chromium browser with Manifest V3 support (Chrome/Edge 88+).
+- Node.js 18+ (development and local builds).
+- AWS account with CodePipeline access and the ability to create IAM users/roles.
+- Optional: AWS CLI for verifying permissions.
 
 ## IAM Setup
 
-Create a dedicated IAM user with the following policy to ensure least-privilege access.
+Create a least-privilege IAM identity that can read CodePipeline metadata before entering credentials in the extension.
 
-1. Go to AWS IAM Console -> Users -> Create user.
-2. Name it `CodePipelineMonitor` (or similar).
-3. Attach policies directly -> Create policy -> JSON.
-4. Paste the following policy:
+### Option 1: AWS managed policy (recommended)
+
+1. IAM Console → Users → **Create user** (e.g., `CodePipelineMonitor`).
+2. Attach the `AWSCodePipeline_ReadOnlyAccess` managed policy.
+3. Generate an access key (Security credentials → **Create access key** → Third-party service).
+
+### Option 2: Custom minimal policy
 
 ```json
 {
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "codepipeline:ListPipelines",
-                "codepipeline:ListPipelineExecutions",
-                "codepipeline:GetPipeline",
-                "codepipeline:GetPipelineState",
-                "codepipeline:GetPipelineExecution"
-            ],
-            "Resource": "*"
-        }
-    ]
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "codepipeline:ListPipelines",
+        "codepipeline:ListPipelineExecutions"
+      ],
+      "Resource": "*"
+    }
+  ]
 }
 ```
 
-5. Finish creating the user.
-6. Create Access Keys (Security credentials -> Create access key -> Third-party service).
-7. Copy the **Access Key ID** and **Secret Access Key**.
+### Cross-account access (optional)
+
+1. Create the IAM user in your primary account.
+2. In the target account, create an IAM role with the same read-only permissions.
+3. Update the role’s trust policy to allow the user to assume it.
+4. Copy the role ARN into the extension settings (`Role ARN to Assume`).
 
 ## Installation
 
-### From Source
+### From source (current workflow)
 
-1. Clone this repository.
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Build the extension:
-   ```bash
-   npm run build
-   ```
-4. Load into Chrome:
-   - Open `chrome://extensions/`
-   - Enable "Developer mode" (top right toggle).
-   - Click "Load unpacked".
-   - Select the `dist` folder created by the build step.
+```bash
+git clone https://github.com/yourusername/aws-codepipeline-status.git
+cd aws-codepipeline-status
+npm install
+npm run build
+```
+
+Then load the generated `dist` folder via `chrome://extensions` → **Load unpacked** (Developer Mode enabled).
 
 ## Configuration
 
-1. Click the extension icon in the toolbar.
-2. Click "Settings" (or it will prompt you if not configured).
-3. Enter your:
-   - **Access Key ID**
-   - **Secret Access Key**
-   - **Region** (e.g., `us-east-1`)
-   - **Pipeline Filter** (optional, e.g., `prod` to match "MyApp-Prod")
-   - **Refresh Interval** (default 60 seconds)
-4. Click "Test Connection" to verify.
-5. Click "Save Settings".
+1. Click the toolbar icon and open **Settings**.
+2. Fill in the required fields:
+   - **AWS Access Key ID**
+   - **AWS Secret Access Key**
+   - **AWS Region** (e.g., `us-east-1`, `ap-southeast-2`)
+3. Optional enhancements:
+   - **Role ARN to Assume** for cross-account reads.
+   - **Pipeline Name Filter** (case-insensitive substring).
+   - **Refresh Interval** (>= 30 seconds).
+4. Click **Test Connection** to validate credentials/permissions.
+5. Click **Save Settings** to persist everything in Chrome storage.
 
-## Usage
-
-- **View Status**: Click the icon to see the latest status.
-- **Refresh**: Click the refresh icon (↻) in the popup header for an immediate update.
-- **History**: Click on a pipeline row to expand/collapse execution history.
-
-## Development
-
-To develop on this extension:
-
-1. Run watch mode:
-   ```bash
-   npm run dev
-   ```
-2. Load the `dist` folder in Chrome.
-3. Changes will trigger a rebuild, but you may need to close/reopen the popup or reload the extension in `chrome://extensions` for background script changes.
-
-## Troubleshooting
-
-- **Connection Failed**: Check your Region and Internet connection. Ensure the IAM user has the correct permissions.
-- **No Pipelines Found**: Check your Filter setting. It is a case-insensitive substring match.
-- **Errors**: Open the extension options page and test connection. Open Chrome DevTools (Right click popup -> Inspect) to see console logs.
-
-## License
-
-MIT
 
