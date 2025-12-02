@@ -93,7 +93,7 @@ export const Options = () => {
       <h1>AWS CodePipeline Status Settings</h1>
       
       <div className="security-notice">
-        <strong>Security Notice:</strong> AWS access keys are stored locally in this browser profile using Chrome's local storage and are used only to call AWS APIs from this extension. Use a dedicated, least-privilege IAM user for read-only CodePipeline access.
+        <strong>Security Notice:</strong> Your AWS Secret Access Key is encrypted before being stored locally in this browser profile. Credentials are used only to call AWS APIs from this extension. Use a dedicated, least-privilege IAM user for read-only CodePipeline access.
       </div>
 
       <FormGroup label="AWS Access Key ID">
