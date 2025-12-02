@@ -86,4 +86,28 @@ Then load the generated `dist` folder via `chrome://extensions` → **Load unpac
 4. Click **Test Connection** to validate credentials/permissions.
 5. Click **Save Settings** to persist everything in Chrome storage.
 
+## Security
+
+### Encrypted Credentials
+
+Your **AWS Secret Access Key** is encrypted at rest using AES-256-GCM encryption before being stored in Chrome's local storage. The encryption key is derived from a constant passphrase using PBKDF2 with 100,000 iterations.
+
+- **Access Key ID** and other settings are stored in plain text (they are not sensitive on their own)
+- **Secret Access Key** is automatically encrypted when saved and decrypted when retrieved
+- Encryption happens transparently - no user action required
+
+### Customizing the Encryption Key
+
+For enhanced security, you can change the encryption passphrase by editing `src/utils/crypto.ts`:
+
+```typescript
+const ENCRYPTION_PASSPHRASE = 'aws-codepipeline-status-extension-v1-encryption-key';
+```
+
+**Important notes:**
+- Change this constant to any unique string before building the extension
+- If you change the passphrase after storing credentials, you'll need to re-enter your AWS Secret Access Key
+- Each installation can use a different passphrase for additional security
+- After changing, run `npm run build` to rebuild the extension
+
 
