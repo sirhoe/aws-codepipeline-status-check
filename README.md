@@ -8,10 +8,11 @@ The popup dashboard (built with React 18, TypeScript, Vite, and TanStack Query) 
 
 ![Popup preview showing four succeeded pipelines](docs/codepipeline-status.png)
 
-## Feature
+## Features
 
 - **Live pipeline list** with total and filtered counts, status badges, and quick manual refresh.
 - **Execution summaries** for each pipeline, including timestamps pulled via `listPipelineExecutions`.
+- **Pending approval detection** showing deployment runs waiting for manual approval with one-click approve action.
 - **Smart filtering & rate limiting** so long AWS orgs can search thousands of pipelines without spamming the API.
 - **Auto-refresh loop** backed by the background service worker and alarms (default 3 minutes, min 30 seconds).
 - **Secure credential handling** that optionally assumes IAM roles before instantiating the `CodePipelineClient`.
@@ -26,15 +27,9 @@ The popup dashboard (built with React 18, TypeScript, Vite, and TanStack Query) 
 
 ## IAM Setup
 
-Create a least-privilege IAM identity that can read CodePipeline metadata before entering credentials in the extension.
+Create an IAM user with read and write permissions to monitor pipelines and approve pending deployments.
 
-### Option 1: AWS managed policy (recommended)
-
-1. IAM Console → Users → **Create user** (e.g., `CodePipelineMonitor`).
-2. Attach the `AWSCodePipeline_ReadOnlyAccess` managed policy.
-3. Generate an access key (Security credentials → **Create access key** → Third-party service).
-
-### Option 2: Custom minimal policy
+### Recommended: Custom policy with approval permissions
 
 ```json
 {
@@ -44,13 +39,20 @@ Create a least-privilege IAM identity that can read CodePipeline metadata before
       "Effect": "Allow",
       "Action": [
         "codepipeline:ListPipelines",
-        "codepipeline:ListPipelineExecutions"
+        "codepipeline:ListPipelineExecutions",
+        "codepipeline:GetPipelineState",
+        "codepipeline:PutApprovalResult"
       ],
       "Resource": "*"
     }
   ]
 }
 ```
+
+**Setup steps:**
+1. IAM Console → Users → **Create user** (e.g., `CodePipelineMonitor`).
+2. Attach the policy above (or create an inline policy with these permissions).
+3. Generate an access key (Security credentials → **Create access key** → Third-party service).
 
 ### Cross-account access (optional)
 
