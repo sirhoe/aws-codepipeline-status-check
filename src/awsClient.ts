@@ -1,5 +1,6 @@
 import { CodePipelineClient } from "@aws-sdk/client-codepipeline";
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
+import { IAMClient } from "@aws-sdk/client-iam";
 import { Settings } from "./types";
 
 export async function createCodePipelineClient(settings: Pick<Settings, 'accessKeyId' | 'secretAccessKey' | 'region' | 'roleArn'>): Promise<CodePipelineClient> {
@@ -48,5 +49,15 @@ export async function createCodePipelineClient(settings: Pick<Settings, 'accessK
     return new CodePipelineClient({
         region: settings.region,
         credentials: baseCredentials,
+    });
+}
+
+export function createIAMClient(settings: Pick<Settings, 'accessKeyId' | 'secretAccessKey' | 'region'>): IAMClient {
+    return new IAMClient({
+        region: settings.region,
+        credentials: {
+            accessKeyId: settings.accessKeyId,
+            secretAccessKey: settings.secretAccessKey,
+        },
     });
 }
