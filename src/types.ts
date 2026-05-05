@@ -3,7 +3,7 @@ export interface Settings {
   secretAccessKey: string;
   region: string;
   roleArn?: string;
-  pipelineFilter?: string;
+  pipelineFilters?: string[];
   refreshIntervalMs: number;
 }
 

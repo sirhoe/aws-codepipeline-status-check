@@ -68,9 +68,14 @@ async function fetchPipelineStatus() {
 
     // Filter
     let filteredPipelines = pipelines;
-    const normalizedFilter = settings.pipelineFilter?.trim().toLowerCase();
-    if (normalizedFilter) {
-      filteredPipelines = pipelines.filter(p => p.name?.toLowerCase().includes(normalizedFilter));
+    const normalizedFilters = (settings.pipelineFilters ?? [])
+      .map(f => f.trim().toLowerCase())
+      .filter(Boolean);
+    if (normalizedFilters.length > 0) {
+      filteredPipelines = pipelines.filter(p => {
+        const n = p.name?.toLowerCase() ?? '';
+        return normalizedFilters.some(f => n.includes(f));
+      });
     }
     const matchedPipelines = filteredPipelines.length;
 

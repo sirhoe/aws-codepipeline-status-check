@@ -11,6 +11,27 @@ export async function getSettings(): Promise<Partial<Settings>> {
     storedSettings.secretAccessKey = await decrypt(storedSettings.secretAccessKey);
   }
   
+  // Migrate legacy single-string filter and normalize array form.
+  const legacy = (storedSettings as any).pipelineFilter;
+  let filters: string[] | undefined = Array.isArray(storedSettings.pipelineFilters)
+    ? storedSettings.pipelineFilters
+    : (typeof legacy === 'string' && legacy.trim() ? [legacy] : undefined);
+
+  if (filters) {
+    const seen = new Set<string>();
+    filters = filters
+      .map(f => (typeof f === 'string' ? f.trim() : ''))
+      .filter(f => {
+        if (!f) return false;
+        const k = f.toLowerCase();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    storedSettings.pipelineFilters = filters;
+  }
+  delete (storedSettings as any).pipelineFilter;
+
   return { ...DEFAULT_SETTINGS, ...storedSettings };
 }
 

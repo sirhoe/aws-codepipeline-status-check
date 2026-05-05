@@ -212,3 +212,55 @@ button:disabled {
   overflow-y: auto;
 }
 
+.chip-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  min-height: 40px;
+  cursor: text;
+  box-sizing: border-box;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #e9ecef;
+  color: #232f3e;
+  padding: 2px 4px 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: #555;
+  padding: 0 6px;
+  border-radius: 50%;
+}
+
+.chip-remove:hover {
+  color: #d00;
+}
+
+.chip-field input.chip-input {
+  flex: 1;
+  min-width: 140px;
+  width: auto;
+  border: none;
+  outline: none;
+  padding: 4px;
+  font-size: 14px;
+  background: transparent;
+}
+

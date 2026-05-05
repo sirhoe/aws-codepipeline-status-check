@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSettings } from '../hooks/useSettings';
 import { createCodePipelineClient, createIAMClient } from '../awsClient';
 import { FormGroup } from '../components/FormGroup';
@@ -13,7 +13,9 @@ export const Options = () => {
   const [secretAccessKey, setSecretAccessKey] = useState('');
   const [region, setRegion] = useState('us-east-1');
   const [roleArn, setRoleArn] = useState('');
-  const [pipelineFilter, setPipelineFilter] = useState('');
+  const [pipelineFilters, setPipelineFilters] = useState<string[]>([]);
+  const [filterDraft, setFilterDraft] = useState('');
+  const chipInputRef = useRef<HTMLInputElement>(null);
   const [refreshValue, setRefreshValue] = useState(60);
   const [refreshUnit, setRefreshUnit] = useState<'seconds' | 'minutes'>('seconds');
   
@@ -30,7 +32,7 @@ export const Options = () => {
       if (settings.secretAccessKey) setSecretAccessKey(settings.secretAccessKey);
       if (settings.region) setRegion(settings.region);
       if (settings.roleArn) setRoleArn(settings.roleArn);
-      if (settings.pipelineFilter) setPipelineFilter(settings.pipelineFilter);
+      if (settings.pipelineFilters) setPipelineFilters(settings.pipelineFilters);
       
       if (settings.refreshIntervalMs) {
         if (settings.refreshIntervalMs >= 60000 && settings.refreshIntervalMs % 60000 === 0) {
@@ -51,13 +53,19 @@ export const Options = () => {
     }
 
     const ms = refreshUnit === 'minutes' ? refreshValue * 60000 : refreshValue * 1000;
-    
+
+    const draftTrimmed = filterDraft.trim();
+    const finalFilters = draftTrimmed && !pipelineFilters.some(x => x.toLowerCase() === draftTrimmed.toLowerCase())
+      ? [...pipelineFilters, draftTrimmed]
+      : pipelineFilters;
+    if (draftTrimmed) setFilterDraft('');
+
     const newSettings: Settings = {
       accessKeyId,
       secretAccessKey,
       region,
       roleArn,
-      pipelineFilter,
+      pipelineFilters: finalFilters,
       refreshIntervalMs: ms
     };
 
@@ -127,7 +135,7 @@ export const Options = () => {
 
       log('Saving new credentials to storage...');
       const ms = refreshUnit === 'minutes' ? refreshValue * 60000 : refreshValue * 1000;
-      await saveSettings({ accessKeyId: newKey.AccessKeyId, secretAccessKey: newKey.SecretAccessKey, region, roleArn, pipelineFilter, refreshIntervalMs: ms });
+      await saveSettings({ accessKeyId: newKey.AccessKeyId, secretAccessKey: newKey.SecretAccessKey, region, roleArn, pipelineFilters, refreshIntervalMs: ms });
       setAccessKeyId(newKey.AccessKeyId);
       setSecretAccessKey(newKey.SecretAccessKey);
       log('Credentials saved.');
@@ -167,6 +175,40 @@ export const Options = () => {
       setStatusMsg({ text: `Connection Failed: ${error.message}`, type: 'error' });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const addFilter = (raw: string) => {
+    const v = raw.trim();
+    if (!v) return;
+    setPipelineFilters(arr =>
+      arr.some(x => x.toLowerCase() === v.toLowerCase()) ? arr : [...arr, v]
+    );
+  };
+
+  const commitDraft = () => {
+    if (filterDraft.trim()) addFilter(filterDraft);
+    setFilterDraft('');
+  };
+
+  const onDraftChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    if (v.includes(',')) {
+      const parts = v.split(',');
+      const tail = parts.pop() ?? '';
+      parts.forEach(addFilter);
+      setFilterDraft(tail);
+    } else {
+      setFilterDraft(v);
+    }
+  };
+
+  const onDraftKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      if (filterDraft.trim()) { e.preventDefault(); commitDraft(); }
+    } else if (e.key === 'Backspace' && filterDraft === '' && pipelineFilters.length > 0) {
+      e.preventDefault();
+      setPipelineFilters(arr => arr.slice(0, -1));
     }
   };
 
@@ -222,16 +264,33 @@ export const Options = () => {
         />
       </FormGroup>
 
-      <FormGroup 
-        label="Pipeline Name Filter (Optional)"
-        helpText="Leave empty to show all pipelines."
+      <FormGroup
+        label="Pipeline Name Filters (Optional)"
+        helpText="Press Enter or comma to add. Empty list shows all pipelines. Substring match, case-insensitive."
       >
-        <input 
-          type="text" 
-          value={pipelineFilter} 
-          onChange={(e) => setPipelineFilter(e.target.value)} 
-          placeholder="substring match (case-insensitive)"
-        />
+        <div className="chip-field" onClick={() => chipInputRef.current?.focus()}>
+          {pipelineFilters.map((f, i) => (
+            <span className="chip" key={`${f}-${i}`}>
+              {f}
+              <button
+                type="button"
+                className="chip-remove"
+                aria-label={`Remove ${f}`}
+                onClick={() => setPipelineFilters(arr => arr.filter((_, j) => j !== i))}
+              >×</button>
+            </span>
+          ))}
+          <input
+            ref={chipInputRef}
+            className="chip-input"
+            type="text"
+            value={filterDraft}
+            onChange={onDraftChange}
+            onKeyDown={onDraftKeyDown}
+            onBlur={commitDraft}
+            placeholder={pipelineFilters.length ? '' : 'e.g. backend-prod'}
+          />
+        </div>
       </FormGroup>
 
       <FormGroup label="Refresh Interval">
