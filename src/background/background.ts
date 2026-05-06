@@ -15,6 +15,13 @@ import { installXmlPolyfill } from "../utils/xml-polyfill";
 // Install XML Polyfill for AWS SDK in Service Worker
 installXmlPolyfill();
 
+const BATCH_SIZE = 5;
+const BATCH_DELAY_MS = 300;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function getPendingApproval(client: Awaited<ReturnType<typeof createCodePipelineClient>>, pipelineName: string): Promise<PendingApproval | undefined> {
   try {
     const stateCommand = new GetPipelineStateCommand({ name: pipelineName });
@@ -81,12 +88,10 @@ async function fetchPipelineStatus() {
 
     const pipelineStatuses: PipelineStatus[] = [];
 
-    for (const pipeline of filteredPipelines) {
-      if (!pipeline.name) continue;
-
+    async function fetchOnePipeline(name: string): Promise<PipelineStatus> {
       try {
         const executionsCommand = new ListPipelineExecutionsCommand({
-          pipelineName: pipeline.name,
+          pipelineName: name,
           maxResults: 5
         });
 
@@ -99,26 +104,27 @@ async function fetchPipelineStatus() {
           lastUpdateTime: exec.lastUpdateTime ? exec.lastUpdateTime.toISOString() : undefined
         }));
 
-        // Check for pending approval if latest execution is InProgress
         if (mappedExecutions.length > 0 && mappedExecutions[0].status === 'InProgress') {
-          const pendingApproval = await getPendingApproval(client, pipeline.name);
+          const pendingApproval = await getPendingApproval(client, name);
           if (pendingApproval) {
             mappedExecutions[0].pendingApproval = pendingApproval;
           }
         }
 
-        pipelineStatuses.push({
-          pipelineName: pipeline.name,
-          executions: mappedExecutions
-        });
-
+        return { pipelineName: name, executions: mappedExecutions };
       } catch (err) {
-        console.error(`Error fetching executions for pipeline ${pipeline.name}:`, err);
-        // We continue to other pipelines even if one fails
-        pipelineStatuses.push({
-            pipelineName: pipeline.name,
-            executions: []
-        });
+        console.error(`Error fetching executions for pipeline ${name}:`, err);
+        return { pipelineName: name, executions: [] };
+      }
+    }
+
+    const named = filteredPipelines.filter(p => p.name) as (PipelineSummary & { name: string })[];
+    for (let i = 0; i < named.length; i += BATCH_SIZE) {
+      const batch = named.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(batch.map(p => fetchOnePipeline(p.name)));
+      pipelineStatuses.push(...results);
+      if (i + BATCH_SIZE < named.length) {
+        await sleep(BATCH_DELAY_MS);
       }
     }
 
