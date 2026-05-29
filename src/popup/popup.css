@@ -80,6 +80,48 @@ header h1 {
   color: #444;
 }
 
+.search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+.search-input {
+  flex: 1;
+  padding: 5px 28px 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #333;
+  background: #fafafa;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: #232f3e;
+  background: #fff;
+}
+
+.search-clear {
+  position: absolute;
+  right: 18px;
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.search-clear:hover {
+  color: #333;
+}
+
 .content {
   flex: 1;
   overflow-y: auto;
