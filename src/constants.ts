@@ -4,7 +4,9 @@ export const STATUS_COLORS: Record<string, string> = {
   'Succeeded': '#28a745',
   'Failed': '#dc3545',
   'InProgress': '#fd7e14',
+  'RolledBack': '#e0a800',
   'Stopped': '#6c757d',
+  'Stopping': '#6c757d',
   'Cancelled': '#6c757d',
   'Superseded': '#6c757d'
 };

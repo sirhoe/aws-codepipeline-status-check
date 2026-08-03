@@ -11,7 +11,9 @@ Built with React 18, TypeScript, Vite, and TanStack Query. Calls AWS directly vi
 ## Features
 
 - **Live pipeline list** with total and filtered counts, status badges, and quick manual refresh.
-- **Execution summaries** for each pipeline, including timestamps pulled via `listPipelineExecutions`.
+- **Stage-aware status** derived from `GetPipelineState`, so failed, stopped, cancelled, in-progress, or rolled-back stages are not hidden behind a later successful stage or successful rollback execution.
+- **Execution summaries** for each pipeline, including timestamps and rollback labels from `listPipelineExecutions`.
+- **Stage detail** in the expanded pipeline view, showing each stage’s latest status (including `Succeeded (Rollback)`).
 - **Pending approval detection** showing deployment runs waiting for manual approval with a one-click approve action.
 - **Multi-filter chips** — add one or more pipeline name filters (case-insensitive substring match). Enter, Tab, or comma commits a chip; Backspace removes the last one.
 - **Auto-refresh loop** backed by a Manifest V3 service worker and alarms (default 3 minutes, minimum 30 seconds).

@@ -191,6 +191,26 @@ header h1 {
   border-top: 1px solid #eee;
 }
 
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 4px 0 6px;
+}
+
+.stage-list {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.stage-name {
+  font-weight: 600;
+  color: #333;
+}
+
 .history-item {
   display: flex;
   justify-content: space-between;

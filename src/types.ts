@@ -14,17 +14,28 @@ export interface PendingApproval {
   token: string;
 }
 
+export type StageExecutionType = 'STANDARD' | 'ROLLBACK';
+
+export interface StageStatusSummary {
+  stageName: string;
+  status: string;
+  type?: StageExecutionType;
+}
+
 export interface PipelineExecutionSummary {
   pipelineExecutionId: string;
   status: string;
   startTime?: string;
   lastUpdateTime?: string;
+  triggerType?: string;
+  executionType?: StageExecutionType;
   pendingApproval?: PendingApproval;
 }
 
 export interface PipelineStatus {
   pipelineName: string;
   executions: PipelineExecutionSummary[];
+  stages: StageStatusSummary[];
 }
 
 export interface PipelineStatusState {

@@ -4,12 +4,23 @@ import {
   GetPipelineStateCommand,
   PutApprovalResultCommand,
   PipelineSummary,
-  PipelineExecutionSummary as AWSPipelineExecutionSummary
+  PipelineExecutionSummary as AWSPipelineExecutionSummary,
+  StageState,
+  GetPipelineStateCommandOutput
 } from "@aws-sdk/client-codepipeline";
 import { createCodePipelineClient } from "../awsClient";
 import { getSettings, savePipelineStatus } from "../storage";
-import { PipelineStatus, PipelineStatusState, PipelineExecutionSummary, PendingApproval, RefreshMessage, ApproveMessage } from "../types";
+import {
+  PipelineStatus,
+  PipelineStatusState,
+  PipelineExecutionSummary,
+  PendingApproval,
+  RefreshMessage,
+  ApproveMessage,
+  StageStatusSummary
+} from "../types";
 import { ALARM_NAME } from "../constants";
+import { parseStageExecutionType } from "../utils/status";
 import { installXmlPolyfill } from "../utils/xml-polyfill";
 
 // Install XML Polyfill for AWS SDK in Service Worker
@@ -22,28 +33,46 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function getPendingApproval(client: Awaited<ReturnType<typeof createCodePipelineClient>>, pipelineName: string): Promise<PendingApproval | undefined> {
-  try {
-    const stateCommand = new GetPipelineStateCommand({ name: pipelineName });
-    const stateResponse = await client.send(stateCommand);
+function mapStageStates(stageStates: StageState[] | undefined): StageStatusSummary[] {
+  return (stageStates || []).map((stage) => {
+    const latest = stage.latestExecution;
+    return {
+      stageName: stage.stageName || '',
+      status: latest?.status || 'Unknown',
+      type: parseStageExecutionType(latest?.type)
+    };
+  });
+}
 
-    for (const stage of stateResponse.stageStates || []) {
-      for (const action of stage.actionStates || []) {
-        // Check if this is a manual approval action waiting for approval
-        if (action.latestExecution?.status === 'InProgress' && action.latestExecution?.token) {
-          return {
-            pipelineName,
-            stageName: stage.stageName || '',
-            actionName: action.actionName || '',
-            token: action.latestExecution.token
-          };
-        }
+function findPendingApproval(
+  pipelineName: string,
+  stageStates: StageState[] | undefined
+): PendingApproval | undefined {
+  for (const stage of stageStates || []) {
+    for (const action of stage.actionStates || []) {
+      if (action.latestExecution?.status === 'InProgress' && action.latestExecution?.token) {
+        return {
+          pipelineName,
+          stageName: stage.stageName || '',
+          actionName: action.actionName || '',
+          token: action.latestExecution.token
+        };
       }
     }
-  } catch (err) {
-    console.error(`Error fetching pipeline state for ${pipelineName}:`, err);
   }
   return undefined;
+}
+
+async function getPipelineState(
+  client: Awaited<ReturnType<typeof createCodePipelineClient>>,
+  pipelineName: string
+): Promise<GetPipelineStateCommandOutput | undefined> {
+  try {
+    return await client.send(new GetPipelineStateCommand({ name: pipelineName }));
+  } catch (err) {
+    console.error(`Error fetching pipeline state for ${pipelineName}:`, err);
+    return undefined;
+  }
 }
 
 async function fetchPipelineStatus() {
@@ -95,26 +124,38 @@ async function fetchPipelineStatus() {
           maxResults: 5
         });
 
-        const executionsResponse = await client.send(executionsCommand);
+        const [executionsResponse, stateResponse] = await Promise.all([
+          client.send(executionsCommand),
+          getPipelineState(client, name)
+        ]);
 
-        const mappedExecutions: PipelineExecutionSummary[] = (executionsResponse.pipelineExecutionSummaries || []).map((exec: AWSPipelineExecutionSummary) => ({
-          pipelineExecutionId: exec.pipelineExecutionId || '',
-          status: exec.status || 'Unknown',
-          startTime: exec.startTime ? exec.startTime.toISOString() : undefined,
-          lastUpdateTime: exec.lastUpdateTime ? exec.lastUpdateTime.toISOString() : undefined
-        }));
+        const mappedExecutions: PipelineExecutionSummary[] = (executionsResponse.pipelineExecutionSummaries || []).map((exec: AWSPipelineExecutionSummary) => {
+          const triggerType = exec.trigger?.triggerType;
+          const isRollbackTrigger =
+            triggerType === 'AutomatedRollback' || triggerType === 'ManualRollback';
+          const executionType =
+            parseStageExecutionType(exec.executionType) ??
+            (isRollbackTrigger ? 'ROLLBACK' : undefined);
+          return {
+            pipelineExecutionId: exec.pipelineExecutionId || '',
+            status: exec.status || 'Unknown',
+            startTime: exec.startTime ? exec.startTime.toISOString() : undefined,
+            lastUpdateTime: exec.lastUpdateTime ? exec.lastUpdateTime.toISOString() : undefined,
+            triggerType,
+            executionType
+          };
+        });
 
-        if (mappedExecutions.length > 0 && mappedExecutions[0].status === 'InProgress') {
-          const pendingApproval = await getPendingApproval(client, name);
-          if (pendingApproval) {
-            mappedExecutions[0].pendingApproval = pendingApproval;
-          }
+        const stages = mapStageStates(stateResponse?.stageStates);
+        const pendingApproval = findPendingApproval(name, stateResponse?.stageStates);
+        if (pendingApproval && mappedExecutions.length > 0) {
+          mappedExecutions[0].pendingApproval = pendingApproval;
         }
 
-        return { pipelineName: name, executions: mappedExecutions };
+        return { pipelineName: name, executions: mappedExecutions, stages };
       } catch (err) {
         console.error(`Error fetching executions for pipeline ${name}:`, err);
-        return { pipelineName: name, executions: [] };
+        return { pipelineName: name, executions: [], stages: [] };
       }
     }
 

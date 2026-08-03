@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { PipelineStatus, PendingApproval, ApproveMessage, ApproveResponse } from '../../types';
-import { getStatusColor } from '../../utils/status';
+import {
+  getStatusColor,
+  getPipelineDisplayStatus,
+  getExecutionDisplayLabel,
+  getStageDisplayLabel,
+  getStageColorStatus,
+  getExecutionColorStatus
+} from '../../utils/status';
 import { formatTimeAgo, formatDetailedTimeAgo } from '../../utils/date';
 
 interface PipelineItemProps {
@@ -17,6 +24,8 @@ export const PipelineItem = ({ pipeline }: PipelineItemProps) => {
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const latest = pipeline.executions[0];
+  const stages = pipeline.stages;
+  const displayStatus = getPipelineDisplayStatus(stages, latest);
 
   const handleApprove = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -56,8 +65,8 @@ export const PipelineItem = ({ pipeline }: PipelineItemProps) => {
         <div className="pipeline-info">
           <span className="pipeline-name">{pipeline.pipelineName}</span>
           <div className="pipeline-meta">
-            <span className="status-badge" style={{ backgroundColor: getStatusColor(latest.status) }}>
-              {latest.status}
+            <span className="status-badge" style={{ backgroundColor: getStatusColor(displayStatus) }}>
+              {displayStatus}
             </span>
             {hasPendingApproval && (
               <span className="approval-badge">Awaiting Approval</span>
@@ -86,11 +95,32 @@ export const PipelineItem = ({ pipeline }: PipelineItemProps) => {
 
       {expanded && (
         <div className="pipeline-history">
+          {stages.length > 0 && (
+            <div className="stage-list">
+              <div className="section-label">Stages</div>
+              {stages.map((stage) => (
+                <div key={stage.stageName} className="history-item">
+                  <div className="history-status">
+                    <span
+                      className="status-dot"
+                      style={{ backgroundColor: getStatusColor(getStageColorStatus(stage)) }}
+                    ></span>
+                    <span className="stage-name">{stage.stageName}</span>
+                    <span>{getStageDisplayLabel(stage)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="section-label">Recent executions</div>
           {pipeline.executions.map((exec) => (
             <div key={exec.pipelineExecutionId} className="history-item">
               <div className="history-status">
-                <span className="status-dot" style={{ backgroundColor: getStatusColor(exec.status) }}></span>
-                {exec.status}
+                <span
+                  className="status-dot"
+                  style={{ backgroundColor: getStatusColor(getExecutionColorStatus(exec)) }}
+                ></span>
+                {getExecutionDisplayLabel(exec)}
               </div>
               <span className="history-time">
                 {formatTimeAgo(exec.lastUpdateTime || exec.startTime)} ({new Date(exec.lastUpdateTime || exec.startTime || '').toLocaleTimeString()})
