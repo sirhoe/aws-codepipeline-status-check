@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PipelineStatus, PendingApproval, ApproveMessage, ApproveResponse } from '../../types';
 import {
   getStatusColor,
@@ -6,7 +6,8 @@ import {
   getExecutionDisplayLabel,
   getStageDisplayLabel,
   getStageColorStatus,
-  getExecutionColorStatus
+  getExecutionColorStatus,
+  hasUnsuccessfulStage
 } from '../../utils/status';
 import { formatTimeAgo, formatDetailedTimeAgo } from '../../utils/date';
 
@@ -20,11 +21,17 @@ async function approveAction(approval: PendingApproval): Promise<ApproveResponse
 }
 
 export const PipelineItem = ({ pipeline }: PipelineItemProps) => {
-  const [expanded, setExpanded] = useState(false);
+  const stages = pipeline.stages;
+  const stageIssue = hasUnsuccessfulStage(stages);
+  const [expanded, setExpanded] = useState(stageIssue);
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const latest = pipeline.executions[0];
-  const stages = pipeline.stages;
+
+  useEffect(() => {
+    if (stageIssue) setExpanded(true);
+  }, [stageIssue]);
+
   const displayStatus = getPipelineDisplayStatus(stages, latest);
 
   const handleApprove = async (e: React.MouseEvent) => {

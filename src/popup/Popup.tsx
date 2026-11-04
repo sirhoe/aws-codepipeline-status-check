@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getPipelineLastUpdated } from '../utils/status';
 import { usePipelineStatus } from '../hooks/usePipelineStatus';
 import { useSettings } from '../hooks/useSettings';
 import { Header } from './components/Header';
@@ -28,11 +29,15 @@ export const Popup = () => {
   const isLoading = isStatusLoading || isRefreshing;
   const configured = !isSettingsLoading && settings?.accessKeyId && settings?.secretAccessKey && settings?.region;
 
-  const visiblePipelines = search.trim()
-    ? (statusState?.pipelines ?? []).filter(p =>
-        p.pipelineName.toLowerCase().includes(search.toLowerCase())
-      )
-    : (statusState?.pipelines ?? []);
+  const visiblePipelines = useMemo(() => {
+    const sorted = [...(statusState?.pipelines ?? [])].sort(
+      (a, b) =>
+        getPipelineLastUpdated(b) - getPipelineLastUpdated(a) ||
+        a.pipelineName.localeCompare(b.pipelineName)
+    );
+    const term = search.trim().toLowerCase();
+    return term ? sorted.filter(p => p.pipelineName.toLowerCase().includes(term)) : sorted;
+  }, [statusState?.pipelines, search]);
 
   if (!isSettingsLoading && !configured) {
     return (
